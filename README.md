@@ -1,63 +1,83 @@
-# File Splitter for iCloud Upload
+# iCloud File Splitter
 
-A Python script to split large .rar, .zip, and other files into chunks under 10GB for iCloud upload, then recombine them with integrity verification.
+Split a ZIP, RAR, 7z, or any other large file into chunks small enough to upload on iCloud.com, then join the chunks back into the original file and verify it with a SHA-256 checksum.
 
-## Features
+iCloud.com shows this when a file is too big:
 
-- ✅ Splits files into 9.5GB chunks (safely under 10GB limit)
-- ✅ Creates metadata file with checksums for integrity verification
-- ✅ Progress bars for large file operations
-- ✅ Automatic file integrity verification
-- ✅ Cross-platform compatibility (Windows, Mac, Linux)
-- ✅ Works with any file type (.rar, .zip, .7z, etc.)
+> iCloud Drive on iCloud.com currently limits uploads to a maximum of 10 GB.
 
-## Usage
+Each chunk defaults to 9.5 GB, under that cap. The script uses only the Python standard library, so there is nothing to install beyond Python 3.8.
 
-### Split a large file
+## Quick start
+
 ```bash
 python file_splitter.py split large_file.zip
 ```
 
-This creates:
-- `large_file.zip.part001`, `large_file.zip.part002`, etc.
-- `large_file.zip.metadata` (contains reconstruction info)
+That writes:
 
-### Combine chunks back into original file
+- `large_file.zip.part001`, `large_file.zip.part002`, and so on
+- `large_file.zip.metadata`, which stores the original name, size, chunk list, and SHA-256 hashes
+
+Upload every `.part` file and the `.metadata` file. Leave the original file off iCloud.
+
+After you download the pieces onto another machine:
+
 ```bash
 python file_splitter.py combine large_file.zip.metadata
 ```
 
-### List chunks in current directory
+The combiner checks each chunk hash, rebuilds the file, then checks the final SHA-256 and file size against the metadata.
+
+## Split a large ZIP, RAR, or other file
+
+```bash
+python file_splitter.py split archive.rar
+python file_splitter.py split archive.rar --chunk-size 8
+```
+
+`--chunk-size` is in gigabytes. Use it when the limit is not iCloud's 10 GB web cap. The same command works for `.zip`, `.rar`, `.7z`, disk images, videos, and any other file.
+
+A file that is already under the chunk size is left as-is.
+
+## Combine split files and verify the checksum
+
+```bash
+python file_splitter.py combine archive.rar.metadata
+```
+
+If the rebuilt file already exists, the script asks before overwriting it. If a chunk is missing or its hash does not match, it stops and names the bad piece.
+
+## List chunk files
+
 ```bash
 python file_splitter.py list
+python file_splitter.py list --directory D:\Downloads
 ```
 
-### Custom chunk size (in GB)
-```bash
-python file_splitter.py split large_file.zip --chunk-size 8.0
-```
+## Upload a file larger than the iCloud limit
 
-## Workflow for iCloud Upload
+1. Split the file on the computer that has the original.
+2. Upload all `.part` files and the `.metadata` file through iCloud.com, or into iCloud Drive.
+3. On the other device, download every part plus the metadata into one folder.
+4. Run `combine` on the metadata file.
 
-1. **Before uploading:**
-   ```bash
-   python file_splitter.py split my_large_archive.rar
-   ```
+Keep the metadata file with the chunks. The script needs it to rebuild the original and to verify the checksum.
 
-2. **Upload to iCloud:**
-   - Upload ALL `.part` files
-   - Upload the `.metadata` file
-   - Don't upload the original file
+iCloud Drive in the Mac and Windows apps can accept a larger individual file than the iCloud.com website. Apple's documentation has described a 50 GB per-file limit there. The 9.5 GB default targets the website upload limit, which blocks a browser upload at 10 GB.
 
-3. **After downloading from iCloud:**
-   ```bash
-   python file_splitter.py combine my_large_archive.rar.metadata
-   ```
+## What the metadata file stores
 
-4. **Verify the file is identical to original**
-   - The script automatically verifies file integrity using SHA256 checksums
+`filename.metadata` is JSON with:
 
-## Example Output
+- the original filename and size
+- the SHA-256 of the original file
+- the chunk size and chunk count
+- each chunk's filename, size, and SHA-256
+
+Those hashes are how a corrupted upload gets caught before you treat the rebuilt file as good.
+
+## Example
 
 ```
 Splitting file: huge_archive.zip
@@ -81,19 +101,10 @@ Chunk 3: |███████████████████████�
 
 ## Requirements
 
-- Python 3.6 or higher (uses built-in libraries only)
-- Enough disk space for chunks (same as original file size)
+- Python 3.8 or newer (`python --version`). The script uses the standard library only.
+- Free disk space about equal to the original file, because the chunks are a full copy.
+- The chunks and the metadata file in the same directory when combining.
 
-## Safety Features
+## License
 
-- **Integrity verification**: SHA256 checksums ensure no corruption
-- **Overwrite protection**: Asks before overwriting existing files
-- **Missing chunk detection**: Warns if chunks are missing before combining
-- **Size verification**: Confirms final file size matches original
-
-## Tips
-
-- Keep the `.metadata` file safe - you need it to recombine chunks
-- All chunks must be present in the same directory as the metadata file
-- The script works with any file type, not just archives
-- Use `list` command to see what chunks are available in a directory 
+[MIT](LICENSE)
